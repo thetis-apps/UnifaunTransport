@@ -21,22 +21,6 @@ var { DateTime } = require('luxon');
 var AWS = require('aws-sdk');
 AWS.config.update({region:'eu-west-1'});
 
-function createUnifaunAddress(address, contactPerson) {
-	var unifaunAddress = new Object(); 
-	if (contactPerson != null) {
-		unifaunAddress.contact = contactPerson.name;
-		unifaunAddress.email = contactPerson.email;
-		unifaunAddress.mobile = contactPerson.mobileNumber;
-		unifaunAddress.phone = contactPerson.phoneNumber;
-	} 
-	unifaunAddress.name1 = address.addressee;
-	unifaunAddress.street1 = address.streetNameAndNumber;
-	unifaunAddress.zipCode = address.postalCode;
-	unifaunAddress.city = address.cityTownOrVillage;
-	unifaunAddress.countryCode = address.countryCode;
-	return unifaunAddress;
-}
-
 /**
  * Send a response to CloudFormation regarding progress in creating resource.
  */
@@ -66,7 +50,8 @@ exports.initializer = async (input, context) => {
 			setup.user = "RAFRFWPPDI5PHJ5W";
 			setup.pin = "U2YW3OMPKC3B5FB5FDF2BJD6";
 			setup.test = true;
-			setup.mediaType = "THERMO_190";
+			setup.bulkId = "1";
+			setup.senderQuickId = "DEMO";
 			let dataDocument = new Object();
 			dataDocument.PostnordTransport = setup;
 			carrier.dataDocument = JSON.stringify(dataDocument);
@@ -121,12 +106,16 @@ async function getIMS() {
 	return ims;
 }
 
-async function getUnifaun(ims, eventId) {
+async function getUnifaun(setup) {
  
-    const unifaunUrl = "https://api.gls.dk/ws/DK/V1/";
+    const unifaunUrl = "https://api.unifaun.com/rs-extapi/v1/";
     
     var unifaun = axios.create({
-		baseURL: unifaunUrl
+		baseURL: unifaunUrl, 
+		headers: { "Authorization": "Bearer " + setup.user + "-" + setup.pin },
+		validateStatus: function (status) {
+		    return status >= 200 && status < 300 || status == 422; // default
+		}
 	});
 	
 	unifaun.interceptors.response.use(function (response) {
@@ -135,12 +124,6 @@ async function getUnifaun(ims, eventId) {
 		}, function (error) {
 			if (error.response) {
 				console.log("FAILURE " + error.response.status + " - " + JSON.stringify(error.response.data));
-				var message = new Object
-				message.time = Date.now();
-				message.source = "unifaunTransport";
-				message.messageType = "ERROR";
-				message.messageText = error.response.data.Message;
-				ims.post("events/" + eventId + "/messages", message);
 			}
 	    	return Promise.reject(error);
 		});
@@ -167,8 +150,25 @@ function lookupCarrier(carriers, carrierName) {
 	return carriers[i];
 }
 
+function setPartyAddress(party, address) {
+	party.name = address.addressee;
+	party.address1 = address.streetNameAndNumber;
+	party.address2 = address.districtOrCityArea;
+	party.city = address.cityTownOrVillage;
+	party.state = address.stateOrProvince;
+	party.country = address.cuntryCode;
+	party.zipcode = address.postalCode;
+}
+
+function setPartyContact(party, contactPerson) {
+	party.contact = contactPerson.name;
+	party.email = contactPerson.email;
+	party.mobile = contactPerson.mobileNumber;
+	party.phone = contactPerson.phoneNumber;
+}
+
 /**
- * A Lambda function that get shipping labels for parcels from unifaun.
+ * A Lambda function that get shipping labels from unifaun.
  */
 exports.shippingLabelRequestHandler = async (event, context) => {
 	
@@ -180,72 +180,206 @@ exports.shippingLabelRequestHandler = async (event, context) => {
 
 	let ims = await getIMS();
 	
-	let unifaun = await getUnifaun(ims, detail.eventId);
-
     let response = await ims.get("carriers");
-    var carriers = response.data;
+    let carriers = response.data;
     
     let carrier = lookupCarrier(carriers, 'Postnord');
-    var dataDocument = JSON.parse(carrier.dataDocument);
-    var setup = dataDocument.GLSTransport;
+    let dataDocument = JSON.parse(carrier.dataDocument);
+    let setup = dataDocument.PostnordTransport;
     
+	let unifaun = await getUnifaun(setup);
+
     response = await ims.get("shipments/" + shipmentId);
-    var shipment = response.data;
+    let shipment = response.data;
     
-	var unifaunShipment = new Object();
+	let unifaunShipment = new Object();
 	
-	let i = 1;
-	var parcels = [];
-	var shippingContainers = [];
-	shippingContainers = shipment.shippingContainers;
-	shippingContainers.forEach(function(shippingContainer) {
-    		var parcel = new Object();
-    		
-    		
-    		parcels.push(parcel);
-    		i++;
-    	});
+	// Set print configuration
 	
-	unifaunShipment.parcels = parcels;
+	let printConfig = { 
+		target1Media: "thermo-190",
+		target1Type: "zpl",
+		target1YOffset: 0,
+	    target1XOffset: 0,
+	    target1Options: [{
+	      key: "mode",
+	      value: "DT"
+	    }],
+	    target2Media: null,
+	    target2Type: "pdf",
+	    target2YOffset: 0,
+	    target2XOffset: 0,
+	    target3Media: null,
+	    target3Type: "pdf",
+	    target3YOffset: 0,
+	    target3XOffset: 0,
+	    target4Media: null,
+	    target4Type: "pdf",
+	    target4YOffset: 0,
+	    target4XOffset: 0 };
+  
 	
-	var contactPerson = shipment.contactPerson;
-	var unifaunDeliveryAddress = createUnifaunAddress(shipment.deliveryAddress, contactPerson);
+	// Set shipment attributes
 	
-	var senderAddress;
-	var senderContactPerson;
+	unifaunShipment.orderNo = shipment.shipmentNumber;
+	unifaunShipment.senderReference = shipment.sellersReference;
+	unifaunShipment.receiverReference = shipment.customersReference;
+	unifaunShipment.deliveryDate = shipment.deliveryDate;
+	unifaunShipment.note = shipment.notesOnShipping;
+	unifaunShipment.deliveryInstruction = shipment.notesOnDelivery;
+	unifaunShipment.test = setup.test;
+	
+	// Set service code 
+
+	let service = new Object();
+	if (shipment.deliverToPickUpPoint) {
+		service.id = "P19DK";
+	} else {
+		if (shipment.deliveryAddress.countryCode == "DK") {
+			service.id = "PDK17";
+		} else {
+			service.id = "PDKBREVI";
+			unifaunShipment.bulkId = setup.bulkId;
+		}
+	}
+	unifaunShipment.service = service;
+	
+	// Set receiver
+	
+	unifaunShipment.receiver = new Object();
+	setPartyAddress(unifaunShipment.receiver, shipment.deliveryAddress);
+	setPartyContact(unifaunShipment.receiver, shipment.contactPerson);
+	unifaunShipment.receiver.custNo = shipment.customerNumber;
+
+	// Set sender
+
+	unifaunShipment.sender = new Object();
     var sellerId = shipment.sellerId;
 	if (sellerId != null) {
 	    response = await ims.get("sellers/" + sellerId);
-		senderAddress = response.data.address;
-		senderContactPerson = response.data.contactPerson;
+	    let seller = response.data;
+	    setPartyAddress(unifaunShipment.sender, seller.address);
+	    setPartyContact(unifaunShipment.sender, seller.contactPerson);
 	} else {
-		senderAddress = context.address;
-		senderContactPerson = context.contactPerson;
+		response = await ims.get("contexts/" + shipment.contextId);
+		let context = response.data;
+	    setPartyAddress(unifaunShipment.sender, context.address);
+	    setPartyContact(unifaunShipment.sender, context.contactPerson);
 	}
-	var unifaunAlternativeShipper = createUnifaunAddress(senderAddress, senderContactPerson);
+    unifaunShipment.sender.quickId = setup.senderQuickId;
 	
-    response = await unifaun.post("CreateShipment", unifaunShipment);
-    var unifaunResponse = response.data;
+	// Set add-on services
+
+	let addons = [];
+	if (shipment.deliverToPickUpPoint) {
+		
+		let addon = new Object();
+		addon.id = "PUPOPT";
+		addons.push(addon);
+
+		let agent = new Object();
+		agent.quickId = shipment.pickUpPointId;
+		unifaunShipment.agent = agent;
+
+	}
+
+	if (shipment.sendMailNotification) {
+		let addon = new Object();
+		addon.id = "NOTEMAIL";
+		addons.push(addon);
+	}
+
+	if (shipment.sendSmsNotification) {
+		let addon = new Object();
+		addon.id = "NOTSMS";
+		addons.push(addon);
+	}
+
+	service.addons = addons;
+
+	// Create parcels
+
+	let i = 1;
+	let parcels = [];
+	let shippingContainers = [];
+	shippingContainers = shipment.shippingContainers;
+	shippingContainers.forEach(function(shippingContainer) {
+		let parcel = new Object();
+		parcel.copies = 1;
+		parcel.weight = shippingContainer.grossWeight;
+		let dimensions = shippingContainer.dimensions;
+		if (dimensions != null) {
+			parcel.height = dimensions.height;
+			parcel.width = dimensions.width;
+			parcel.length = dimensions.length;
+		} 
+		parcel.reference = shippingContainer.id;
+		parcels.push(parcel);
+		i++;
+	});
+	
+	unifaunShipment.parcels = parcels;
+	
+	// Now post the shipment to Unifaun
+	
+    let unifaunRequest = new Object();
+	unifaunRequest.printConfig = printConfig;
+	unifaunRequest.shipment = unifaunShipment;
+	
+	console.log(JSON.stringify(unifaunRequest));
+
+    response = await unifaun.post("shipments", unifaunRequest, { params: { "returnFile": true }});
+
+	if (response.status == 422) {
+		
+		// Send error messages
+		
+		let errors = response.data;
+		for (let i = 0; i < errors.length; i++) {
+			let error = errors[i];
+			let message = new Object();
+			message.time = Date.now();
+			message.source = "PostnordTransport";
+			message.messageType = "ERROR";
+			message.messageText = error.field + ": " + error.message;
+			await ims.post("events/" + detail.eventId + "/messages", message);
+		}
+		
+	} else {
     
-	var shippingLabel = new Object();
-	shippingLabel.base64EncodedContent = unifaunResponse.PDF;
-	shippingLabel.fileName = "SHIPPING_LABEL_" + shipmentId + ".pdf";
-	await ims.post("shipments/"+ shipmentId + "/attachments", shippingLabel);
+    	let unifaunResponse = response.data[0];
+    
+		console.log(JSON.stringify(unifaunResponse.prints));
 
-	await ims.put("shipments/" + shipmentId + "/consignmentId", unifaunResponse.consignmentId);
+    	// Attach labels to shipment
+    	
+    	let prints = unifaunResponse.prints;
+    	for (let i = 0; i < prints.length; i++) {
+    		let print = prints[i];
+			let shippingLabel = new Object();
+			shippingLabel.base64EncodedContent = print.data;
+			shippingLabel.fileName = "SHIPPING_LABEL_" + shipmentId + ".zpl";
+			await ims.post("shipments/"+ shipmentId + "/attachments", shippingLabel);
+    	}
+    	
+    	// Set tracking number on shipping containers
 
-	for (let i = 0; i < unifaunResponse.parcels.length; i++) {
-		let shippingContainer = shippingContainers[i];
-		let parcel = parcels[i];
-		ims.put("shippingContainers/" + shippingContainer.id + "/trackingNumber", parcel.parcelNumber);
-	}
+		for (let i = 0; i < unifaunResponse.parcels.length; i++) {
+			let shippingContainer = shippingContainers[i];
+			let parcel = parcels[i];
+			ims.put("shippingContainers/" + shippingContainer.id + "/trackingNumber", parcel.parcelNo);
+		}
+		
+		// Send a message to signal that we are done
+		
+		var message = new Object();
+		message.time = Date.now();
+		message.source = "PostnordTransport";
+		message.messageType = "INFO";
+		message.messageText = "Labels are ready";
+		await ims.post("events/" + detail.eventId + "/messages", message);
 	
-	var message = new Object();
-	message.time = Date.now();
-	message.source = "unifaunTransport";
-	message.messageType = "INFO";
-	message.messageText = "Labels are ready";
-	await ims.post("events/" + detail.eventId + "/messages", message);
+	}
 
 	return "done";
 

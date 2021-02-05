@@ -50,9 +50,8 @@ exports.initializer = async (input, context) => {
 			setup.user = "RAFRFWPPDI5PHJ5W";
 			setup.pin = "U2YW3OMPKC3B5FB5FDF2BJD6";
 			setup.test = true;
-			setup.printType = 
-			setup.mediaType = "THERMO_190";
 			setup.bulkId = "1";
+			setup.senderQuickId = "DEMO";
 			let dataDocument = new Object();
 			dataDocument.PostnordTransport = setup;
 			carrier.dataDocument = JSON.stringify(dataDocument);
@@ -181,15 +180,15 @@ exports.shippingLabelRequestHandler = async (event, context) => {
 
 	let ims = await getIMS();
 	
-	let unifaun = await getUnifaun(ims, detail.eventId);
-
     let response = await ims.get("carriers");
     let carriers = response.data;
     
     let carrier = lookupCarrier(carriers, 'Postnord');
     let dataDocument = JSON.parse(carrier.dataDocument);
-    let setup = dataDocument.GLSTransport;
+    let setup = dataDocument.PostnordTransport;
     
+	let unifaun = await getUnifaun(setup);
+
     response = await ims.get("shipments/" + shipmentId);
     let shipment = response.data;
     
@@ -250,6 +249,7 @@ exports.shippingLabelRequestHandler = async (event, context) => {
 	unifaunShipment.receiver = new Object();
 	setPartyAddress(unifaunShipment.receiver, shipment.deliveryAddress);
 	setPartyContact(unifaunShipment.receiver, shipment.contactPerson);
+	unifaunShipment.receiver.custNo = shipment.customerNumber;
 
 	// Set sender
 
@@ -266,35 +266,36 @@ exports.shippingLabelRequestHandler = async (event, context) => {
 	    setPartyAddress(unifaunShipment.sender, context.address);
 	    setPartyContact(unifaunShipment.sender, context.contactPerson);
 	}
+    unifaunShipment.sender.quickId = setup.senderQuickId;
 	
 	// Set add-on services
 
 	let addons = [];
 	if (shipment.deliverToPickUpPoint) {
-
+		
 		let addon = new Object();
-		addon.setId("PUPOPT");
+		addon.id = "PUPOPT";
 		addons.push(addon);
 
 		let agent = new Object();
-		agent.setQuickId(shipment.pickUpPointId);
+		agent.quickId = shipment.pickUpPointId;
 		unifaunShipment.agent = agent;
 
 	}
 
-	if (shipment.sendMailNotification) {
+	if (shipment.contactPerson.email != null) {
 		let addon = new Object();
-		addon.setId("NOTEMAIL"); 
+		addon.id = "NOTEMAIL";
 		addons.push(addon);
 	}
 
-	if (shipment.sendSmsNotification) {
+	if (shipment.contactPerson.mobileNumber != null) {
 		let addon = new Object();
-		addon.setId("NOTSMS");
+		addon.id = "NOTSMS";
 		addons.push(addon);
 	}
 
-	unifaunShipment.addons = addons;
+	service.addons = addons;
 
 	// Create parcels
 
@@ -324,8 +325,10 @@ exports.shippingLabelRequestHandler = async (event, context) => {
     let unifaunRequest = new Object();
 	unifaunRequest.printConfig = printConfig;
 	unifaunRequest.shipment = unifaunShipment;
+	
+	console.log(JSON.stringify(unifaunRequest));
 
-    response = await unifaun.post("shipments", unifaunShipment, { params: { "returnFile": true }});
+    response = await unifaun.post("shipments", unifaunRequest, { params: { "returnFile": true }});
 
 	if (response.status == 422) {
 		
@@ -338,15 +341,16 @@ exports.shippingLabelRequestHandler = async (event, context) => {
 			message.time = Date.now();
 			message.source = "PostnordTransport";
 			message.messageType = "ERROR";
-			message.messageCode = error.messageCode
 			message.messageText = error.field + ": " + error.message;
 			await ims.post("events/" + detail.eventId + "/messages", message);
 		}
 		
 	} else {
     
-    	let unifaunResponse = response.data;
+    	let unifaunResponse = response.data[0];
     
+		console.log(JSON.stringify(unifaunResponse.prints));
+
     	// Attach labels to shipment
     	
     	let prints = unifaunResponse.prints;
@@ -370,7 +374,7 @@ exports.shippingLabelRequestHandler = async (event, context) => {
 		
 		var message = new Object();
 		message.time = Date.now();
-		message.source = "unifaunTransport";
+		message.source = "PostnordTransport";
 		message.messageType = "INFO";
 		message.messageText = "Labels are ready";
 		await ims.post("events/" + detail.eventId + "/messages", message);
