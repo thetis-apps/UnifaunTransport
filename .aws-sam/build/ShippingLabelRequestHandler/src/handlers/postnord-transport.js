@@ -283,13 +283,13 @@ exports.shippingLabelRequestHandler = async (event, context) => {
 
 	}
 
-	if (shipment.sendMailNotification) {
+	if (shipment.contactPerson.email != null) {
 		let addon = new Object();
 		addon.id = "NOTEMAIL";
 		addons.push(addon);
 	}
 
-	if (shipment.sendSmsNotification) {
+	if (shipment.contactPerson.mobileNumber != null) {
 		let addon = new Object();
 		addon.id = "NOTSMS";
 		addons.push(addon);
