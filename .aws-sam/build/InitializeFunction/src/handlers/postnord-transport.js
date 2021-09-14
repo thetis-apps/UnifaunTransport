@@ -342,6 +342,8 @@ exports.shippingLabelRequestHandler = async (event, context) => {
 			message.source = "PostnordTransport";
 			message.messageType = "ERROR";
 			message.messageText = error.field + ": " + error.message;
+			message.deviceName = detail.deviceName;
+			message.userId = detail.userId;
 			await ims.post("events/" + detail.eventId + "/messages", message);
 		}
 		
@@ -377,6 +379,8 @@ exports.shippingLabelRequestHandler = async (event, context) => {
 		message.source = "PostnordTransport";
 		message.messageType = "INFO";
 		message.messageText = "Labels are ready";
+		message.deviceName = detail.deviceName;
+		message.userId = detail.userId;
 		await ims.post("events/" + detail.eventId + "/messages", message);
 	
 	}
