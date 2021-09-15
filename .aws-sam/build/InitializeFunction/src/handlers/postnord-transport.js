@@ -341,7 +341,7 @@ exports.shippingLabelRequestHandler = async (event, context) => {
 			message.time = Date.now();
 			message.source = "PostnordTransport";
 			message.messageType = "ERROR";
-			message.messageText = error.field + ": " + error.message;
+			message.messageText = "Failed to register shipment with Postnord. Postnord says: " + error.field + ": " + error.message;
 			message.deviceName = detail.deviceName;
 			message.userId = detail.userId;
 			await ims.post("events/" + detail.eventId + "/messages", message);

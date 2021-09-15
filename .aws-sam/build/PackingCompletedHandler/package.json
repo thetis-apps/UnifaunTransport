@@ -4,7 +4,7 @@
     "version": "0.0.1",
     "private": true,
     "dependencies": {
-        "axios": "^0.21.1",
+        "axios": "^0.21.2",
         "luxon": "^1.25.0"
     },
     "devDependencies": {
