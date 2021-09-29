@@ -351,7 +351,7 @@ exports.shippingLabelRequestHandler = async (event, context) => {
     
     	let unifaunResponse = response.data[0];
     
-		console.log(JSON.stringify(unifaunResponse.prints));
+		console.log(JSON.stringify(unifaunResponse));
 
     	// Attach labels to shipment
     	
@@ -366,11 +366,16 @@ exports.shippingLabelRequestHandler = async (event, context) => {
     	
     	// Set tracking number on shipping containers
 
+		parcels = unifaunResponse.parcels;
 		for (let i = 0; i < unifaunResponse.parcels.length; i++) {
 			let shippingContainer = shippingContainers[i];
 			let parcel = parcels[i];
-			ims.put("shippingContainers/" + shippingContainer.id + "/trackingNumber", parcel.parcelNo);
+			await ims.patch("shippingContainers/" + shippingContainer.id, { trackingNumber: parcel.parcelNo });
 		}
+		
+		// Set carriers shipment number
+		
+		await ims.patch("shipments/" + shipment.id, { carriersShipmentNumber: unifaunResponse.id })
 		
 		// Send a message to signal that we are done
 		
