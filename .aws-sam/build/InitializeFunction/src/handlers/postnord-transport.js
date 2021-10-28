@@ -156,7 +156,7 @@ function setPartyAddress(party, address) {
 	party.address2 = address.districtOrCityArea;
 	party.city = address.cityTownOrVillage;
 	party.state = address.stateOrProvince;
-	party.country = address.cuntryCode;
+	party.country = address.countryCode;
 	party.zipcode = address.postalCode;
 }
 
