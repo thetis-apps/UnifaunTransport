@@ -198,7 +198,7 @@ exports.shippingLabelRequestHandler = async (event, context) => {
 	
 	let printConfig = { 
 		target1Media: "thermo-190",
-		target1Type: "zpl",
+		target1Type: "pdf",
 		target1YOffset: 0,
 	    target1XOffset: 0,
 	    target1Options: [{
@@ -360,7 +360,7 @@ exports.shippingLabelRequestHandler = async (event, context) => {
     		let print = prints[i];
 			let shippingLabel = new Object();
 			shippingLabel.base64EncodedContent = print.data;
-			shippingLabel.fileName = "SHIPPING_LABEL_" + shipmentId + ".zpl";
+			shippingLabel.fileName = "SHIPPING_LABEL_" + shipmentId + ".pdf";
 			await ims.post("shipments/"+ shipmentId + "/attachments", shippingLabel);
     	}
     	

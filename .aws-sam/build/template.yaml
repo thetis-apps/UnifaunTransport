@@ -13,7 +13,7 @@ Metadata:
     Labels:
     - thetis-ims
     HomePageUrl: https://github.com/thetis-apps/PostnordTransport
-    SemanticVersion: '0.3.0'
+    SemanticVersion: 1.0.0
     SourceCodeUrl: https://github.com/thetis-apps/PostnordTransport
 Parameters:
   ContextId:
@@ -28,6 +28,11 @@ Parameters:
     Default: ThetisClientSecret
   ApiKey:
     Type: String
+  DevOpsEmail:
+    Description: The email address to send mail to when messages in the dead letter
+      queue.
+    Type: String
+    MinLength: 4
 Resources:
   PackingCompletedHandler:
     Type: AWS::Serverless::Function
@@ -120,6 +125,7 @@ Resources:
     Type: AWS::SNS::Topic
     Properties:
       Subscription:
-      - Endpoint: devops@thetis-apps.com
+      - Endpoint:
+          Ref: DevOpsEmail
         Protocol: email
       DisplayName: Incidents to be handled by Thetis Devops.
