@@ -232,14 +232,18 @@ exports.shippingLabelRequestHandler = async (event, context) => {
 	// Set service code 
 
 	let service = new Object();
-	if (shipment.deliverToPickUpPoint) {
-		service.id = "P19DK";
+	if (shipment.vatNumber != null) {
+		service.id = "PDKEP"; 
 	} else {
-		if (shipment.deliveryAddress.countryCode == "DK") {
-			service.id = "PDK17";
+		if (shipment.deliverToPickUpPoint) {
+			service.id = "P19DK";
 		} else {
-			service.id = "PDKBREVI";
-			unifaunShipment.bulkId = setup.bulkId;
+			if (shipment.deliveryAddress.countryCode == "DK") {
+				service.id = "PDK17";
+			} else {
+				service.id = "PDKBREVI";
+				unifaunShipment.bulkId = setup.bulkId;
+			}
 		}
 	}
 	unifaunShipment.service = service;

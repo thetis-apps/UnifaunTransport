@@ -13,7 +13,7 @@ Metadata:
     Labels:
     - thetis-ims
     HomePageUrl: https://github.com/thetis-apps/PostnordTransport
-    SemanticVersion: 1.0.1
+    SemanticVersion: 1.1.0
     SourceCodeUrl: https://github.com/thetis-apps/PostnordTransport
 Parameters:
   ContextId:
