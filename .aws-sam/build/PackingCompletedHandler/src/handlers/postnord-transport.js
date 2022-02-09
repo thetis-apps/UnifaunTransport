@@ -374,7 +374,8 @@ exports.shippingLabelRequestHandler = async (event, context) => {
 		for (let i = 0; i < unifaunResponse.parcels.length; i++) {
 			let shippingContainer = shippingContainers[i];
 			let parcel = parcels[i];
-			await ims.patch("shippingContainers/" + shippingContainer.id, { trackingNumber: parcel.parcelNo });
+			let trackingUrl = 'http://www.postnord.dk/da/Sider/TrackTrace.aspx?search=' + parcel.parcelNo;
+			await ims.patch("shippingContainers/" + shippingContainer.id, { trackingNumber: parcel.parcelNo, trackingUrl: trackingUrl });
 		}
 		
 		// Set carriers shipment number

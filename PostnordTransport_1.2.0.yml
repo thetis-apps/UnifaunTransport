@@ -8,8 +8,8 @@ Metadata:
     Description: Application for integrating Thetis IMS with the freight carrier Postnord.
     Author: thetis-apps
     SpdxLicenseId: Apache-2.0
-    LicenseUrl: ../../LICENSE.txt
-    ReadmeUrl: ../../README.md
+    LicenseUrl: s3://aws-sam-cli-managed-default-samclisourcebucket-1q52gionhjeg3/4612b8d5aa75b9b9936c9b7b9e6c7e82
+    ReadmeUrl: s3://aws-sam-cli-managed-default-samclisourcebucket-1q52gionhjeg3/74da18019f04994dc6ffb608796cbd70
     Labels:
     - thetis-ims
     HomePageUrl: https://github.com/thetis-apps/PostnordTransport
@@ -71,7 +71,7 @@ Resources:
           Fn::GetAtt:
           - DeadLetterQueue
           - Arn
-      CodeUri: PackingCompletedHandler
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-1q52gionhjeg3/e860b11b31ba566a65d32135757ac09d
   InitResource:
     Type: AWS::CloudFormation::CustomResource
     Properties:
@@ -96,7 +96,7 @@ Resources:
             Ref: ClientSecret
           ApiKey:
             Ref: ApiKey
-      CodeUri: InitializeFunction
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-1q52gionhjeg3/e860b11b31ba566a65d32135757ac09d
   DeadLetterQueue:
     Type: AWS::SQS::Queue
     Properties: {}

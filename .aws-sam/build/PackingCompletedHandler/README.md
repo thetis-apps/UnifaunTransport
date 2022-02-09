@@ -51,6 +51,3 @@ The shipping containers are updated with the tracking numbers assigned to the co
 
 Shipping labels are attached to the shipment.
 
-
-
-
