@@ -222,8 +222,8 @@ exports.shippingLabelRequestHandler = async (event, context) => {
 	// Set shipment attributes
 	
 	unifaunShipment.orderNo = shipment.shipmentNumber;
-	unifaunShipment.senderReference = shipment.sellersReference;
-	unifaunShipment.receiverReference = shipment.customersReference;
+	unifaunShipment.senderReference = shipment.sellersReference != null ? shipment.sellersReference : shipment.shipmentNumber;
+	unifaunShipment.receiverReference = shipment.customersReference != null ? shipment.customersReference : shipment.shipmentNumber;
 	unifaunShipment.deliveryDate = shipment.deliveryDate;
 	unifaunShipment.note = shipment.notesOnShipping;
 	unifaunShipment.deliveryInstruction = shipment.notesOnDelivery;
