@@ -167,19 +167,11 @@ function setPartyContact(party, contactPerson) {
 	party.phone = contactPerson.phoneNumber;
 }
 
-/**
- * A Lambda function that get shipping labels from unifaun.
- */
-exports.shippingLabelRequestHandler = async (event, context) => {
+async function book(ims, detail) {
 	
-    console.info(JSON.stringify(event));
-
-    var detail = event.detail;
     var shipmentId = detail.shipmentId;
     var contextId = detail.contextId;
 
-	let ims = await getIMS();
-	
     let response = await ims.get("carriers");
     let carriers = response.data;
     
@@ -334,6 +326,7 @@ exports.shippingLabelRequestHandler = async (event, context) => {
 
     response = await unifaun.post("shipments", unifaunRequest, { params: { "returnFile": true }});
 
+	let labels = [];
 	if (response.status == 422) {
 		
 		// Send error messages
@@ -365,7 +358,7 @@ exports.shippingLabelRequestHandler = async (event, context) => {
 			let shippingLabel = new Object();
 			shippingLabel.base64EncodedContent = print.data;
 			shippingLabel.fileName = "SHIPPING_LABEL_" + shipmentId + ".pdf";
-			await ims.post("shipments/"+ shipmentId + "/attachments", shippingLabel);
+			labels.push(shippingLabel);
     	}
     	
     	// Set tracking number on shipping containers
@@ -380,7 +373,30 @@ exports.shippingLabelRequestHandler = async (event, context) => {
 		
 		// Set carriers shipment number
 		
-		await ims.patch("shipments/" + shipment.id, { carriersShipmentNumber: unifaunResponse.id })
+		await ims.patch("shipments/" + shipment.id, { carriersShipmentNumber: unifaunResponse.id });
+		
+	}
+
+	return labels;
+}
+
+/**
+ * A Lambda function that get shipping labels from unifaun.
+ */
+exports.shippingLabelRequestHandler = async (event, context) => {
+	
+    console.info(JSON.stringify(event));
+
+    var detail = event.detail;
+	let ims = await getIMS();
+
+	let labels = await book(ims, detail);
+	
+	if (labels.length > 0) {
+
+		for (let label of labels) {
+			await ims.post("shipments/"+ detail.shipmentId + "/attachments", label);
+		}
 		
 		// Send a message to signal that we are done
 		
@@ -392,9 +408,34 @@ exports.shippingLabelRequestHandler = async (event, context) => {
 		message.deviceName = detail.deviceName;
 		message.userId = detail.userId;
 		await ims.post("events/" + detail.eventId + "/messages", message);
-	
 	}
-
+	
 	return "done";
 
 }
+
+exports.bookingHandler = async (event, context) => {
+
+    console.info(JSON.stringify(event));
+
+    var detail = event.detail;
+
+	let ims = await getIMS();
+
+	await ims.patch('/documents/' + detail.documentId, { workStatus: 'ON_GOING' });
+	
+    let labels = await book(ims, detail);
+    
+	if (labels.length > 0) {
+		for (let label of labels) {
+			await ims.post('/documents/' + detail.documentId + '/attachments', label);
+		}
+		await ims.patch('/documents/' + detail.documentId, { workStatus: 'DONE' });
+    } else {
+		await ims.patch('/documents/' + detail.documentId, { workStatus: 'FAILED' });
+    }
+    
+	return "done";
+	
+};
+
