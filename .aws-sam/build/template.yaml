@@ -13,7 +13,7 @@ Metadata:
     Labels:
     - thetis-ims
     HomePageUrl: https://github.com/thetis-apps/PostnordTransport
-    SemanticVersion: 2.0.0
+    SemanticVersion: 2.0.1
     SourceCodeUrl: https://github.com/thetis-apps/PostnordTransport
 Parameters:
   ContextId:
@@ -72,6 +72,8 @@ Resources:
           - DeadLetterQueue
           - Arn
       CodeUri: PackingCompletedHandler
+    Metadata:
+      SamResourceId: PackingCompletedHandler
   BookingHandler:
     Type: AWS::Serverless::Function
     Properties:
@@ -112,6 +114,8 @@ Resources:
           - DeadLetterQueue
           - Arn
       CodeUri: BookingHandler
+    Metadata:
+      SamResourceId: BookingHandler
   InitResource:
     Type: AWS::CloudFormation::CustomResource
     Properties:
@@ -137,9 +141,12 @@ Resources:
           ApiKey:
             Ref: ApiKey
       CodeUri: InitializeFunction
+    Metadata:
+      SamResourceId: InitializeFunction
   DeadLetterQueue:
     Type: AWS::SQS::Queue
-    Properties: {}
+    Properties:
+      KmsMasterKeyId: alias/aws/sqs
   Alarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
@@ -164,6 +171,7 @@ Resources:
   IncidentTopic:
     Type: AWS::SNS::Topic
     Properties:
+      KmsMasterKeyId: alias/aws/sns
       Subscription:
       - Endpoint:
           Ref: DevOpsEmail
