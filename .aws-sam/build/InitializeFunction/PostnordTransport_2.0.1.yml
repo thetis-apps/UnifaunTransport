@@ -8,16 +8,13 @@ Metadata:
     Description: Application for integrating Thetis IMS with the freight carrier Postnord.
     Author: thetis-apps
     SpdxLicenseId: Apache-2.0
-    LicenseUrl: ../../LICENSE.txt
-    ReadmeUrl: ../../README.md
+    LicenseUrl: s3://aws-sam-cli-managed-default-samclisourcebucket-1q52gionhjeg3/4612b8d5aa75b9b9936c9b7b9e6c7e82
+    ReadmeUrl: s3://aws-sam-cli-managed-default-samclisourcebucket-1q52gionhjeg3/74da18019f04994dc6ffb608796cbd70
     Labels:
     - thetis-ims
     HomePageUrl: https://github.com/thetis-apps/PostnordTransport
-    SemanticVersion: 2.1.0
+    SemanticVersion: 2.0.1
     SourceCodeUrl: https://github.com/thetis-apps/PostnordTransport
-Globals:
-  Function:
-    Runtime: nodejs16.x
 Parameters:
   ContextId:
     Type: String
@@ -42,6 +39,7 @@ Resources:
     Properties:
       Description: Function that runs when a shipping label is requested by Thetis
         IMS
+      Runtime: nodejs12.x
       Handler: src/handlers/postnord-transport.shippingLabelRequestHandler
       Environment:
         Variables:
@@ -73,7 +71,7 @@ Resources:
           Fn::GetAtt:
           - DeadLetterQueue
           - Arn
-      CodeUri: PackingCompletedHandler
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-1q52gionhjeg3/823627cdae9ea57451efba375827c8d6
     Metadata:
       SamResourceId: PackingCompletedHandler
   BookingHandler:
@@ -81,6 +79,7 @@ Resources:
     Properties:
       Description: Function that runs when a transport booking is created in Thetis
         IMS
+      Runtime: nodejs12.x
       Handler: src/handlers/postnord-transport.bookingHandler
       Environment:
         Variables:
@@ -114,7 +113,7 @@ Resources:
           Fn::GetAtt:
           - DeadLetterQueue
           - Arn
-      CodeUri: BookingHandler
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-1q52gionhjeg3/823627cdae9ea57451efba375827c8d6
     Metadata:
       SamResourceId: BookingHandler
   InitResource:
@@ -125,11 +124,14 @@ Resources:
         - InitializeFunction
         - Arn
       Version: 1
+    Metadata:
+      SamResourceId: InitResource
   InitializeFunction:
     Type: AWS::Serverless::Function
     DeletionPolicy: Delete
     Properties:
       Handler: src/handlers/postnord-transport.initializer
+      Runtime: nodejs12.x
       MemorySize: 2048
       Timeout: 30
       Environment:
@@ -140,13 +142,15 @@ Resources:
             Ref: ClientSecret
           ApiKey:
             Ref: ApiKey
-      CodeUri: InitializeFunction
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-1q52gionhjeg3/823627cdae9ea57451efba375827c8d6
     Metadata:
       SamResourceId: InitializeFunction
   DeadLetterQueue:
     Type: AWS::SQS::Queue
     Properties:
       KmsMasterKeyId: alias/aws/sqs
+    Metadata:
+      SamResourceId: DeadLetterQueue
   Alarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
@@ -168,6 +172,8 @@ Resources:
           - QueueName
       TreatMissingData: notBreaching
       Statistic: Maximum
+    Metadata:
+      SamResourceId: Alarm
   IncidentTopic:
     Type: AWS::SNS::Topic
     Properties:
@@ -177,3 +183,5 @@ Resources:
           Ref: DevOpsEmail
         Protocol: email
       DisplayName: Incidents to be handled by Thetis Devops.
+    Metadata:
+      SamResourceId: IncidentTopic
